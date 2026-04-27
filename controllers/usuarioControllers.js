@@ -1,42 +1,46 @@
-const bcrypt = require('bcrypt');
 const db = require('../banco');
 
-exports.cadastrarUsuario = async (req, res) => {
-  try {
-    const { nome, email, senha } = req.body;
-    if (!nome || !email || !senha)
-      return res.status(400).json({ erro: 'Preencha todos os campos' });
+// 🔧 Manutentor
+const loginManutentor = (req, res) => {
+  const { cpf, senha, oficina } = req.body;
 
-    const senhaHash = await bcrypt.hash(senha, 10);
-    await db.query('INSERT INTO usuarios (nome, email, senha) VALUES (?, ?, ?)', [nome, email, senhaHash]);
-    return res.status(201).json({ mensagem: 'Usuário cadastrado com sucesso' });
-  } catch (error) {
-    if (error.code === 'ER_DUP_ENTRY')
-      return res.status(409).json({ erro: 'Este email já está cadastrado' });
-    console.error(error);
-    return res.status(500).json({ erro: 'Erro no servidor' });
-  }
+  const sql = `
+    SELECT * FROM usuarios
+    WHERE cpf = ? AND senha = ? AND tipo = 'manutentor' AND oficina = ?
+  `;
+
+  db.query(sql, [cpf, senha, oficina], (err, result) => {
+    if (err) return res.status(500).json(err);
+
+    if (result.length > 0) {
+      res.json({ sucesso: true, usuario: result[0] });
+    } else {
+      res.status(401).json({ erro: 'Credenciais inválidas' });
+    }
+  });
 };
 
-exports.loginUsuario = async (req, res) => {
-  try {
-    const { email, senha } = req.body;
-    if (!email || !senha)
-      return res.status(400).json({ erro: 'Preencha todos os campos' });
+// 📦 Almoxarife
+const loginAlmoxarife = (req, res) => {
+  const { cpf, senha } = req.body;
 
-    const [rows] = await db.query('SELECT * FROM usuarios WHERE email = ?', [email]);
-    if (rows.length === 0)
-      return res.status(401).json({ erro: 'Email ou senha inválidos' });
+  const sql = `
+    SELECT * FROM usuarios
+    WHERE cpf = ? AND senha = ? AND tipo = 'almoxarife'
+  `;
 
-    const usuario = rows[0];
-    const senhaCorreta = await bcrypt.compare(senha, usuario.senha);
-    if (!senhaCorreta)
-      return res.status(401).json({ erro: 'Email ou senha inválidos' });
+  db.query(sql, [cpf, senha], (err, result) => {
+    if (err) return res.status(500).json(err);
 
-    // Retorna o nome para o frontend salvar no localStorage
-    return res.status(200).json({ mensagem: `Bem-vindo, ${usuario.nome}!`, nome: usuario.nome });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ erro: 'Erro no servidor' });
-  }
+    if (result.length > 0) {
+      res.json({ sucesso: true, usuario: result[0] });
+    } else {
+      res.status(401).json({ erro: 'Credenciais inválidas' });
+    }
+  });
+};
+
+module.exports = {
+  loginManutentor,
+  loginAlmoxarife
 };
