@@ -10,6 +10,7 @@ app.use(express.json());
 // ── Rotas existentes ──────────────────────────────────────────────────────────
 app.use('/api', require('./rotas/usuarioRota'));
 app.use('/api', require('./rotas/ferramentaRotas'));      // GET /ferramentas, GET /ferramentas/:codigo
+app.use('/api', require('./rotas/Trocasrotas'));
 
 // ── Novas rotas de controle de status ────────────────────────────────────────
 app.use('/api', require('./rotas/statusRotas'));
