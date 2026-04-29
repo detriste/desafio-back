@@ -1,6 +1,5 @@
 const db = require('../banco');
 
-// GET /trocas/pendentes?destinatario=Nome
 exports.listarPendentes = async (req, res) => {
   const { destinatario } = req.query;
   if (!destinatario) return res.json([]);
@@ -10,12 +9,9 @@ exports.listarPendentes = async (req, res) => {
       [destinatario]
     );
     return res.json(rows);
-  } catch (err) {
-    return res.status(500).json({ erro: 'Erro no servidor' });
-  }
+  } catch (err) { return res.status(500).json({ erro: 'Erro no servidor' }); }
 };
 
-// GET /trocas/aceitas?solicitante=Nome
 exports.listarAceitas = async (req, res) => {
   const { solicitante } = req.query;
   if (!solicitante) return res.json([]);
@@ -25,98 +21,73 @@ exports.listarAceitas = async (req, res) => {
       [solicitante]
     );
     return res.json(rows);
-  } catch (err) {
-    return res.status(500).json({ erro: 'Erro no servidor' });
-  }
+  } catch (err) { return res.status(500).json({ erro: 'Erro no servidor' }); }
 };
 
-// POST /trocas/:id/aceitar
-// Só marca como aceita — quem atualiza a ferramenta é o solicitante depois
 exports.aceitar = async (req, res) => {
   const { id } = req.params;
-
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
-
     const [trocas] = await conn.query('SELECT * FROM trocas WHERE id = ?', [id]);
     if (!trocas.length) { await conn.rollback(); return res.status(404).json({ erro: 'Troca não encontrada.' }); }
-    const troca = trocas[0];
-    if (troca.status !== 'pendente') { await conn.rollback(); return res.status(409).json({ erro: 'Troca já foi processada.' }); }
-
+    if (trocas[0].status !== 'pendente') { await conn.rollback(); return res.status(409).json({ erro: 'Troca já foi processada.' }); }
     await conn.query(`UPDATE trocas SET status = 'aceita' WHERE id = ?`, [id]);
-
     await conn.commit();
     return res.json({ mensagem: 'Troca aceita. Aguardando solicitante confirmar.' });
   } catch (err) {
     await conn.rollback();
     return res.status(500).json({ erro: 'Erro interno.' });
-  } finally {
-    conn.release();
-  }
+  } finally { conn.release(); }
 };
 
-// POST /trocas/:id/concluir
-// Chamado pelo solicitante após aceite — registra a ferramenta no nome dele
 exports.concluir = async (req, res) => {
   const { id } = req.params;
-  const { usuario_cpf, usuario_nome, usuario_area, ordem_servico } = req.body;
+  const { usuario_cracha, usuario_nome, usuario_area, ordem_servico } = req.body;
 
-  if (!usuario_nome || !usuario_area || !ordem_servico) {
+  if (!usuario_nome || !usuario_area || !ordem_servico)
     return res.status(400).json({ erro: 'Preencha todos os campos.' });
-  }
 
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
-
     const [trocas] = await conn.query('SELECT * FROM trocas WHERE id = ?', [id]);
     if (!trocas.length) { await conn.rollback(); return res.status(404).json({ erro: 'Troca não encontrada.' }); }
     const troca = trocas[0];
     if (troca.status !== 'aceita') { await conn.rollback(); return res.status(409).json({ erro: 'Troca não foi aceita ainda.' }); }
 
     await conn.query(
-      `UPDATE ferramentas 
-       SET usuario_cpf = ?, usuario_nome = ?, usuario_area = ?, observacao = ?, data_retirada = NOW() 
-       WHERE id = ?`,
-      [usuario_cpf ?? null, usuario_nome, usuario_area, `OS: ${ordem_servico}`, troca.ferramenta_id]
+      `UPDATE ferramentas SET usuario_cracha=?, usuario_nome=?, usuario_area=?, observacao=?, data_retirada=NOW() WHERE id=?`,
+      [usuario_cracha ?? null, usuario_nome, usuario_area, `OS: ${ordem_servico}`, troca.ferramenta_id]
     );
 
     await conn.query(
-      `INSERT INTO movimentacoes (ferramenta_id, ferramenta_nome, status_anterior, status_novo, usuario_cpf, usuario_nome, usuario_area, observacao, criado_em)
+      `INSERT INTO movimentacoes (ferramenta_id, ferramenta_nome, status_anterior, status_novo, usuario_cracha, usuario_nome, usuario_area, observacao, criado_em)
        VALUES (?, ?, 'em_uso', 'em_uso', ?, ?, ?, ?, NOW())`,
-      [troca.ferramenta_id, troca.ferramenta_nome, usuario_cpf ?? null, usuario_nome, usuario_area,
+      [troca.ferramenta_id, troca.ferramenta_nome, usuario_cracha ?? null, usuario_nome, usuario_area,
        `Troca concluída. Solicitante: ${usuario_nome}. OS: ${ordem_servico}`]
     );
 
     await conn.query(`UPDATE trocas SET status = 'concluida' WHERE id = ?`, [id]);
-
     await conn.commit();
     return res.json({ mensagem: 'Ferramenta registrada no seu nome.' });
   } catch (err) {
     await conn.rollback();
-    console.error('[concluir troca]', err);
     return res.status(500).json({ erro: 'Erro interno.' });
-  } finally {
-    conn.release();
-  }
+  } finally { conn.release(); }
 };
-// POST /trocas/:id/recusar
+
 exports.recusar = async (req, res) => {
   try {
     await db.query(`UPDATE trocas SET status = 'recusada' WHERE id = ?`, [req.params.id]);
     return res.json({ mensagem: 'Troca recusada.' });
-  } catch (err) {
-    return res.status(500).json({ erro: 'Erro ao recusar.' });
-  }
+  } catch (err) { return res.status(500).json({ erro: 'Erro ao recusar.' }); }
 };
 
 exports.solicitar = async (req, res) => {
   const { ferramenta_id, ferramenta_nome, solicitante_nome, solicitante_area, destinatario_nome, destinatario_area } = req.body;
-
-  if (!ferramenta_id || !solicitante_nome || !destinatario_nome) {
+  if (!ferramenta_id || !solicitante_nome || !destinatario_nome)
     return res.status(400).json({ erro: 'Dados incompletos.' });
-  }
 
   try {
     await db.query(
@@ -126,7 +97,6 @@ exports.solicitar = async (req, res) => {
     );
     return res.json({ mensagem: 'Solicitação enviada.' });
   } catch (err) {
-    console.error('[solicitar]', err);
     return res.status(500).json({ erro: 'Erro interno.' });
   }
 };

@@ -1,115 +1,58 @@
 const db = require('../banco');
-const bcrypt = require('bcrypt');
 
-// ── Login Manutentor ──────────────────────────────────────────────────────────
 async function loginManutentor(req, res) {
-  const { cpf, senha, oficina } = req.body;
-
-  if (!cpf || !senha || !oficina) {
+  const { cracha, senha, oficina } = req.body;
+  if (!cracha || !senha || !oficina)
     return res.status(400).json({ erro: 'Preencha todos os campos.' });
-  }
 
   try {
     const [rows] = await db.query(
-      'SELECT * FROM usuarios WHERE cpf = ? AND tipo = "manutentor" AND oficina = ?',
-      [cpf, oficina]
+      'SELECT * FROM usuarios WHERE cracha = ? AND tipo = "manutentor" AND oficina = ?',
+      [cracha, oficina]
     );
-
-    if (!rows.length) {
-      return res.status(401).json({ erro: 'CPF, senha ou oficina incorretos.' });
-    }
-
+    if (!rows.length) return res.status(401).json({ erro: 'Crachá, senha ou oficina incorretos.' });
     const usuario = rows[0];
-   const senhaOk = senha === usuario.senha;
+    if (senha !== usuario.senha) return res.status(401).json({ erro: 'Crachá, senha ou oficina incorretos.' });
 
-    if (!senhaOk) {
-      return res.status(401).json({ erro: 'CPF, senha ou oficina incorretos.' });
-    }
-
-    res.json({
-      usuario: {
-        id:      usuario.id,
-        nome:    usuario.nome,
-        cpf:     usuario.cpf,
-        tipo:    usuario.tipo,
-        oficina: usuario.oficina,
-      }
-    });
+    res.json({ usuario: { id: usuario.id, nome: usuario.nome, cracha: usuario.cracha, tipo: usuario.tipo, oficina: usuario.oficina } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ erro: 'Erro interno.' });
   }
 }
 
-// ── Login Almoxarife ──────────────────────────────────────────────────────────
 async function loginAlmoxarife(req, res) {
-  const { cpf, senha } = req.body;
-
-  if (!cpf || !senha) {
+  const { cracha, senha } = req.body;
+  if (!cracha || !senha)
     return res.status(400).json({ erro: 'Preencha todos os campos.' });
-  }
 
   try {
     const [rows] = await db.query(
-      'SELECT * FROM usuarios WHERE cpf = ? AND tipo = "almoxarife"',
-      [cpf]
+      'SELECT * FROM usuarios WHERE cracha = ? AND tipo = "almoxarife"',
+      [cracha]
     );
-
-    if (!rows.length) {
-      return res.status(401).json({ erro: 'CPF ou senha incorretos.' });
-    }
-
+    if (!rows.length) return res.status(401).json({ erro: 'Crachá ou senha incorretos.' });
     const usuario = rows[0];
-   const senhaOk = senha === usuario.senha;
+    if (senha !== usuario.senha) return res.status(401).json({ erro: 'Crachá ou senha incorretos.' });
 
-    if (!senhaOk) {
-      return res.status(401).json({ erro: 'CPF ou senha incorretos.' });
-    }
-
-    res.json({
-      usuario: {
-        id:      usuario.id,
-        nome:    usuario.nome,
-        cpf:     usuario.cpf,
-        tipo:    usuario.tipo,
-        oficina: usuario.oficina,
-      }
-    });
+    res.json({ usuario: { id: usuario.id, nome: usuario.nome, cracha: usuario.cracha, tipo: usuario.tipo, oficina: usuario.oficina } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ erro: 'Erro interno.' });
   }
 }
 
-// ── Buscar usuário por CPF ────────────────────────────────────────────────────
-// Aceita CPF com ou sem máscara: normaliza para XXX.XXX.XXX-XX antes de buscar
-async function buscarPorCpf(req, res) {
-  let cpf = req.params.cpf;
-
-  // Remove tudo que não for dígito
-  const digits = cpf.replace(/\D/g, '');
-
-  if (digits.length !== 11) {
-    return res.status(400).json({ erro: 'CPF inválido.' });
-  }
-
-  // Formata igual ao padrão salvo no banco: XXX.XXX.XXX-XX
-  const cpfFormatado = digits.replace(
-    /(\d{3})(\d{3})(\d{3})(\d{2})/,
-    '$1.$2.$3-$4'
-  );
+async function buscarPorCracha(req, res) {
+  const cracha = req.params.cracha?.trim();
+  if (!cracha || cracha.length > 4)
+    return res.status(400).json({ erro: 'Crachá inválido.' });
 
   try {
-    // Tenta com formatado e sem formatação para cobrir os dois casos
     const [rows] = await db.query(
-      'SELECT nome, oficina AS area FROM usuarios WHERE cpf = ? OR cpf = ?',
-      [cpfFormatado, digits]
+      'SELECT nome, oficina AS area FROM usuarios WHERE cracha = ?',
+      [cracha]
     );
-
-    if (!rows.length) {
-      return res.status(404).json({ erro: 'Usuário não encontrado.' });
-    }
-
+    if (!rows.length) return res.status(404).json({ erro: 'Usuário não encontrado.' });
     res.json(rows[0]);
   } catch (err) {
     console.error(err);
@@ -117,4 +60,4 @@ async function buscarPorCpf(req, res) {
   }
 }
 
-module.exports = { loginManutentor, loginAlmoxarife, buscarPorCpf };
+module.exports = { loginManutentor, loginAlmoxarife, buscarPorCracha };
