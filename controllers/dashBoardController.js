@@ -8,7 +8,6 @@ exports.getDashboard = async (req, res) => {
     return res.status(400).json({ erro: 'Informe os parâmetros "inicio" e "fim".' });
   }
 
-  // Adiciona 1 dia no fim para incluir o dia inteiro
   const fimDia = `${fim} 23:59:59`;
 
   try {
@@ -63,6 +62,31 @@ exports.getDashboard = async (req, res) => {
       [inicio, fimDia]
     );
 
+    // ── Ferramentas atualmente em uso (não devolvidas) ────────────────────────
+    // Busca direto na tabela ferramentas — sem filtro de período,
+    // pois mostra o estado ATUAL independente de quando foi retirada
+    const [emUsoRaw] = await db.query(
+      `SELECT
+         nome          AS ferramenta_nome,
+         codigo        AS ferramenta_codigo,
+         usuario_nome  AS manutentor_nome,
+         usuario_area  AS manutentor_area,
+         observacao    AS ordem_servico,
+         data_retirada AS data_retirada
+       FROM ferramentas
+       WHERE status = 'em_uso'
+       ORDER BY data_retirada ASC`
+    );
+
+    // Log para debug — aparece no terminal do Node
+    console.log('[dashboard] emUso encontrados:', emUsoRaw.length);
+    if (emUsoRaw.length > 0) {
+      console.log('[dashboard] primeiro item:', emUsoRaw[0]);
+    }
+
+    // Garante que emUso sempre é um array, nunca undefined
+    const emUso = Array.isArray(emUsoRaw) ? emUsoRaw : [];
+
     return res.json({
       periodo: { inicio, fim },
       totais: {
@@ -71,13 +95,14 @@ exports.getDashboard = async (req, res) => {
         total_manutencoes: totais.total_manutencoes ?? 0,
         total_liberacoes:  totais.total_liberacoes  ?? 0,
       },
-      maisUsadas,
-      maisManutencao,
-      maisManutentores,
+      maisUsadas:       Array.isArray(maisUsadas)       ? maisUsadas       : [],
+      maisManutencao:   Array.isArray(maisManutencao)   ? maisManutencao   : [],
+      maisManutentores: Array.isArray(maisManutentores) ? maisManutentores : [],
+      emUso,
     });
 
   } catch (err) {
-    console.error('[dashboard]', err);
+    console.error('[dashboard] ERRO:', err);
     return res.status(500).json({ erro: 'Erro interno no servidor.' });
   }
 };
