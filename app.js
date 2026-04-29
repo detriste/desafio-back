@@ -3,22 +3,14 @@ const cors    = require('cors');
 
 const app = express();
 
-// ── Middlewares ───────────────────────────────────────────────────────────────
 app.use(cors());
 app.use(express.json());
 
-// ── Rotas existentes ──────────────────────────────────────────────────────────
 app.use('/api', require('./rotas/usuarioRota'));
-app.use('/api', require('./rotas/ferramentaRotas'));      // GET /ferramentas, GET /ferramentas/:codigo
-app.use('/api', require('./rotas/Trocasrotas'));
-
-// ── Novas rotas de controle de status ────────────────────────────────────────
 app.use('/api', require('./rotas/statusRotas'));
-// POST /api/ferramentas/:id/retirar
-// POST /api/ferramentas/:id/devolver
-// POST /api/ferramentas/:id/manutencao
-// POST /api/ferramentas/:id/disponibilizar
-
+app.use('/api', require('./rotas/atencaoRotas'));    // ← antes de ferramentaRotas
+app.use('/api', require('./rotas/Trocasrotas'));
+app.use('/api', require('./rotas/ferramentaRotas')); // ← por último
 
 app.listen(3000, () => {
   console.log('Servidor rodando em http://localhost:3000');
