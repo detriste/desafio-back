@@ -73,3 +73,5 @@ INSERT INTO usuarios (cpf, nome, senha, tipo, oficina) VALUES
 
 -- Confirma
 SELECT id, cpf, nome, tipo, oficina FROM usuarios;
+
+ALTER TABLE trocas MODIFY COLUMN status ENUM('pendente','aceita','recusada','concluida') NOT NULL DEFAULT 'pendente';
