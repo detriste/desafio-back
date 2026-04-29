@@ -1,14 +1,32 @@
 const db = require('../banco');
 
+// GET /api/dashboard?inicio=YYYY-MM-DD&fim=YYYY-MM-DD
 exports.getDashboard = async (req, res) => {
-  // Período: se não informado, usa últimos 30 dias
-  const fim    = req.query.fim    ? req.query.fim    + ' 23:59:59' : new Date().toISOString().slice(0, 10) + ' 23:59:59';
-  const inicio = req.query.inicio ? req.query.inicio + ' 00:00:00' : (() => {
-    const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().slice(0, 10) + ' 00:00:00';
-  })();
+  const { inicio, fim } = req.query;
+
+  if (!inicio || !fim) {
+    return res.status(400).json({ erro: 'Informe os parâmetros "inicio" e "fim".' });
+  }
+
+  // Adiciona 1 dia no fim para incluir o dia inteiro
+  const fimDia = `${fim} 23:59:59`;
 
   try {
-    // ── Top ferramentas mais retiradas (em_uso) ───────────────────────────────
+    // ── Totais do período ────────────────────────────────────────────────────
+    const [[totais]] = await db.query(
+      `SELECT
+         COUNT(CASE WHEN status_novo = 'em_uso'      THEN 1 END) AS total_retiradas,
+         COUNT(CASE WHEN status_novo = 'disponivel'
+                    AND status_anterior = 'em_uso'   THEN 1 END) AS total_devolucoes,
+         COUNT(CASE WHEN status_novo = 'manutencao'  THEN 1 END) AS total_manutencoes,
+         COUNT(CASE WHEN status_novo = 'disponivel'
+                    AND status_anterior = 'manutencao' THEN 1 END) AS total_liberacoes
+       FROM movimentacoes
+       WHERE criado_em BETWEEN ? AND ?`,
+      [inicio, fimDia]
+    );
+
+    // ── Ferramentas mais retiradas ────────────────────────────────────────────
     const [maisUsadas] = await db.query(
       `SELECT ferramenta_nome AS nome, COUNT(*) AS total
        FROM movimentacoes
@@ -17,10 +35,10 @@ exports.getDashboard = async (req, res) => {
        GROUP BY ferramenta_nome
        ORDER BY total DESC
        LIMIT 10`,
-      [inicio, fim]
+      [inicio, fimDia]
     );
 
-    // ── Top ferramentas que mais foram para manutenção ────────────────────────
+    // ── Ferramentas com mais manutenções ──────────────────────────────────────
     const [maisManutencao] = await db.query(
       `SELECT ferramenta_nome AS nome, COUNT(*) AS total
        FROM movimentacoes
@@ -29,10 +47,10 @@ exports.getDashboard = async (req, res) => {
        GROUP BY ferramenta_nome
        ORDER BY total DESC
        LIMIT 10`,
-      [inicio, fim]
+      [inicio, fimDia]
     );
 
-    // ── Top manutentores que mais pegaram ferramentas ─────────────────────────
+    // ── Manutentores que mais retiraram ───────────────────────────────────────
     const [maisManutentores] = await db.query(
       `SELECT usuario_nome AS nome, usuario_area AS area, COUNT(*) AS total
        FROM movimentacoes
@@ -42,24 +60,17 @@ exports.getDashboard = async (req, res) => {
        GROUP BY usuario_nome, usuario_area
        ORDER BY total DESC
        LIMIT 10`,
-      [inicio, fim]
-    );
-
-    // ── Totais gerais do período ──────────────────────────────────────────────
-    const [[totais]] = await db.query(
-      `SELECT
-         COUNT(CASE WHEN status_novo = 'em_uso'     THEN 1 END) AS total_retiradas,
-         COUNT(CASE WHEN status_novo = 'disponivel' AND status_anterior = 'em_uso' THEN 1 END) AS total_devolucoes,
-         COUNT(CASE WHEN status_novo = 'manutencao' THEN 1 END) AS total_manutencoes,
-         COUNT(CASE WHEN status_novo = 'disponivel' AND status_anterior = 'manutencao' THEN 1 END) AS total_liberacoes
-       FROM movimentacoes
-       WHERE criado_em BETWEEN ? AND ?`,
-      [inicio, fim]
+      [inicio, fimDia]
     );
 
     return res.json({
       periodo: { inicio, fim },
-      totais,
+      totais: {
+        total_retiradas:   totais.total_retiradas   ?? 0,
+        total_devolucoes:  totais.total_devolucoes  ?? 0,
+        total_manutencoes: totais.total_manutencoes ?? 0,
+        total_liberacoes:  totais.total_liberacoes  ?? 0,
+      },
       maisUsadas,
       maisManutencao,
       maisManutentores,
@@ -67,6 +78,6 @@ exports.getDashboard = async (req, res) => {
 
   } catch (err) {
     console.error('[dashboard]', err);
-    return res.status(500).json({ erro: 'Erro interno.' });
+    return res.status(500).json({ erro: 'Erro interno no servidor.' });
   }
 };
