@@ -1,6 +1,6 @@
 const express = require('express');
 const router  = express.Router();
-const ctrl    = require('/../controllers/trocasController');
+const ctrl    = require('../controllers/trocasController');
 
 router.get('/trocas/pendentes',    ctrl.listarPendentes);
 router.post('/trocas/solicitar',   ctrl.solicitar);

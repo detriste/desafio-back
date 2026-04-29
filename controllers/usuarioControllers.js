@@ -20,7 +20,7 @@ async function loginManutentor(req, res) {
     }
 
     const usuario = rows[0];
-    const senhaOk = await bcrypt.compare(senha, usuario.senha);
+   const senhaOk = senha === usuario.senha;
 
     if (!senhaOk) {
       return res.status(401).json({ erro: 'CPF, senha ou oficina incorretos.' });
@@ -60,7 +60,7 @@ async function loginAlmoxarife(req, res) {
     }
 
     const usuario = rows[0];
-    const senhaOk = await bcrypt.compare(senha, usuario.senha);
+   const senhaOk = senha === usuario.senha;
 
     if (!senhaOk) {
       return res.status(401).json({ erro: 'CPF ou senha incorretos.' });
