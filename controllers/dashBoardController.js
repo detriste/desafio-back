@@ -1,6 +1,5 @@
 const db = require('../banco');
 
-// GET /api/dashboard?inicio=YYYY-MM-DD&fim=YYYY-MM-DD
 exports.getDashboard = async (req, res) => {
   const { inicio, fim } = req.query;
 
@@ -8,24 +7,22 @@ exports.getDashboard = async (req, res) => {
     return res.status(400).json({ erro: 'Informe os parâmetros "inicio" e "fim".' });
   }
 
-  const fimDia = `${fim} 23:59:59`;
+  // Garante que o fim do dia seja incluído
+  const inicioStr = `${inicio} 00:00:00`;
+  const fimStr    = `${fim} 23:59:59`;
 
   try {
-    // ── Totais do período ────────────────────────────────────────────────────
     const [[totais]] = await db.query(
       `SELECT
-         COUNT(CASE WHEN status_novo = 'em_uso'      THEN 1 END) AS total_retiradas,
-         COUNT(CASE WHEN status_novo = 'disponivel'
-                    AND status_anterior = 'em_uso'   THEN 1 END) AS total_devolucoes,
-         COUNT(CASE WHEN status_novo = 'manutencao'  THEN 1 END) AS total_manutencoes,
-         COUNT(CASE WHEN status_novo = 'disponivel'
-                    AND status_anterior = 'manutencao' THEN 1 END) AS total_liberacoes
+         COUNT(CASE WHEN status_novo = 'em_uso'                                    THEN 1 END) AS total_retiradas,
+         COUNT(CASE WHEN status_novo = 'disponivel' AND status_anterior = 'em_uso' THEN 1 END) AS total_devolucoes,
+         COUNT(CASE WHEN status_novo = 'manutencao'                                THEN 1 END) AS total_manutencoes,
+         COUNT(CASE WHEN status_novo = 'disponivel' AND status_anterior = 'manutencao' THEN 1 END) AS total_liberacoes
        FROM movimentacoes
        WHERE criado_em BETWEEN ? AND ?`,
-      [inicio, fimDia]
+      [inicioStr, fimStr]
     );
 
-    // ── Ferramentas mais retiradas ────────────────────────────────────────────
     const [maisUsadas] = await db.query(
       `SELECT ferramenta_nome AS nome, COUNT(*) AS total
        FROM movimentacoes
@@ -34,10 +31,9 @@ exports.getDashboard = async (req, res) => {
        GROUP BY ferramenta_nome
        ORDER BY total DESC
        LIMIT 10`,
-      [inicio, fimDia]
+      [inicioStr, fimStr]
     );
 
-    // ── Ferramentas com mais manutenções ──────────────────────────────────────
     const [maisManutencao] = await db.query(
       `SELECT ferramenta_nome AS nome, COUNT(*) AS total
        FROM movimentacoes
@@ -46,25 +42,22 @@ exports.getDashboard = async (req, res) => {
        GROUP BY ferramenta_nome
        ORDER BY total DESC
        LIMIT 10`,
-      [inicio, fimDia]
+      [inicioStr, fimStr]
     );
 
-    // ── Manutentores que mais retiraram ───────────────────────────────────────
-  const [maisManutentores] = await db.query(
-  `SELECT usuario_nome AS nome, MAX(usuario_area) AS area, COUNT(*) AS total
-   FROM movimentacoes
-   WHERE status_novo = 'em_uso'
-     AND usuario_nome IS NOT NULL
-     AND criado_em BETWEEN ? AND ?
-   GROUP BY usuario_nome
-   ORDER BY total DESC
-   LIMIT 10`,
-  [inicio, fimDia]
-);
+    const [maisManutentores] = await db.query(
+      `SELECT usuario_nome AS nome, MAX(usuario_area) AS area, COUNT(*) AS total
+       FROM movimentacoes
+       WHERE status_novo = 'em_uso'
+         AND usuario_nome IS NOT NULL
+         AND usuario_nome != ''
+         AND criado_em BETWEEN ? AND ?
+       GROUP BY usuario_nome
+       ORDER BY total DESC
+       LIMIT 10`,
+      [inicioStr, fimStr]
+    );
 
-    // ── Ferramentas atualmente em uso (não devolvidas) ────────────────────────
-    // Busca direto na tabela ferramentas — sem filtro de período,
-    // pois mostra o estado ATUAL independente de quando foi retirada
     const [emUsoRaw] = await db.query(
       `SELECT
          nome          AS ferramenta_nome,
@@ -78,14 +71,15 @@ exports.getDashboard = async (req, res) => {
        ORDER BY data_retirada ASC`
     );
 
-    // Log para debug — aparece no terminal do Node
-    console.log('[dashboard] emUso encontrados:', emUsoRaw.length);
-    if (emUsoRaw.length > 0) {
-      console.log('[dashboard] primeiro item:', emUsoRaw[0]);
-    }
-
-    // Garante que emUso sempre é um array, nunca undefined
-    const emUso = Array.isArray(emUsoRaw) ? emUsoRaw : [];
+    // Log completo para debug
+    console.log('======= DASHBOARD DEBUG =======');
+    console.log('Período:', inicioStr, 'até', fimStr);
+    console.log('Totais:', totais);
+    console.log('Mais usadas:', maisUsadas);
+    console.log('Mais manutenção:', maisManutencao);
+    console.log('Mais manutentores:', maisManutentores);
+    console.log('Em uso agora:', emUsoRaw.length, 'ferramenta(s)');
+    console.log('===============================');
 
     return res.json({
       periodo: { inicio, fim },
@@ -95,10 +89,10 @@ exports.getDashboard = async (req, res) => {
         total_manutencoes: totais.total_manutencoes ?? 0,
         total_liberacoes:  totais.total_liberacoes  ?? 0,
       },
-      maisUsadas:       Array.isArray(maisUsadas)       ? maisUsadas       : [],
-      maisManutencao:   Array.isArray(maisManutencao)   ? maisManutencao   : [],
-      maisManutentores: Array.isArray(maisManutentores) ? maisManutentores : [],
-      emUso,
+      maisUsadas:       maisUsadas       ?? [],
+      maisManutencao:   maisManutencao   ?? [],
+      maisManutentores: maisManutentores ?? [],
+      emUso:            emUsoRaw         ?? [],
     });
 
   } catch (err) {
