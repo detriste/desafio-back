@@ -62,6 +62,21 @@ CREATE TABLE trocas (
   FOREIGN KEY (ferramenta_id) REFERENCES ferramentas(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+
+CREATE TABLE solicitacoes_retirada (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  ferramenta_id INT NOT NULL,
+  ferramenta_nome VARCHAR(150) NOT NULL,
+  manutentor_cracha VARCHAR(4) NOT NULL,
+  manutentor_nome VARCHAR(150) NOT NULL,
+  manutentor_area VARCHAR(10) NOT NULL,
+  ordem_servico VARCHAR(50) NOT NULL,
+  status ENUM('pendente','aprovada','recusada') DEFAULT 'pendente',
+  criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (ferramenta_id) REFERENCES ferramentas(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Usuários de teste
 INSERT INTO usuarios (cracha, nome, senha, tipo, oficina) VALUES
 ('0001', 'Carlos Silva',   '1234', 'manutentor', 'MME'),
