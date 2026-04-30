@@ -50,17 +50,17 @@ exports.getDashboard = async (req, res) => {
     );
 
     // ── Manutentores que mais retiraram ───────────────────────────────────────
-    const [maisManutentores] = await db.query(
-      `SELECT usuario_nome AS nome, usuario_area AS area, COUNT(*) AS total
-       FROM movimentacoes
-       WHERE status_novo = 'em_uso'
-         AND usuario_nome IS NOT NULL
-         AND criado_em BETWEEN ? AND ?
-       GROUP BY usuario_nome, usuario_area
-       ORDER BY total DESC
-       LIMIT 10`,
-      [inicio, fimDia]
-    );
+  const [maisManutentores] = await db.query(
+  `SELECT usuario_nome AS nome, MAX(usuario_area) AS area, COUNT(*) AS total
+   FROM movimentacoes
+   WHERE status_novo = 'em_uso'
+     AND usuario_nome IS NOT NULL
+     AND criado_em BETWEEN ? AND ?
+   GROUP BY usuario_nome
+   ORDER BY total DESC
+   LIMIT 10`,
+  [inicio, fimDia]
+);
 
     // ── Ferramentas atualmente em uso (não devolvidas) ────────────────────────
     // Busca direto na tabela ferramentas — sem filtro de período,

@@ -12,6 +12,7 @@ app.use('/api', require('./rotas/ferramentaRotas'));      // GET /ferramentas, G
 app.use('/api', require('./rotas/Trocasrotas'));
 app.use('/api', require('./rotas/atencaoRotas'));
 app.use('/api', require('./rotas/dashBoardRotas'));
+app.use('/api', require('./rotas/solicitacaoRotas'));
 
 // ── Novas rotas de controle de status ────────────────────────────────────────
 app.use('/api', require('./rotas/statusRotas'));
