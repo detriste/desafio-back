@@ -1,4 +1,5 @@
 const db = require('../banco');
+const { enviarEmailManutencao } = require('./emailService');
 
 async function registrarMovimentacao(conn, {
   ferramenta_id, ferramenta_nome, status_anterior, status_novo,
@@ -96,7 +97,7 @@ exports.devolver = async (req, res) => {
 
 exports.enviarManutencao = async (req, res) => {
   const { id } = req.params;
-  const { observacao } = req.body;
+  const { observacao, almoxarife_nome } = req.body;
   if (!observacao?.trim()) return res.status(400).json({ erro: '"observacao" é obrigatório.' });
 
   const conn = await db.getConnection();
@@ -121,6 +122,15 @@ exports.enviarManutencao = async (req, res) => {
     });
 
     await conn.commit();
+
+    // Envia email após commit (não bloqueia a resposta se falhar)
+    enviarEmailManutencao(
+      ferramenta.nome,
+      ferramenta.codigo,
+      observacao.trim(),
+      almoxarife_nome ?? null
+    ).catch(err => console.error('[email manutencao] Falha ao enviar email:', err));
+
     return res.json({ mensagem: `Ferramenta "${ferramenta.nome}" enviada para manutenção.`, ferramenta_id: ferramenta.id, status: 'manutencao' });
   } catch (err) {
     await conn.rollback();
